@@ -4,8 +4,6 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
-import android.hardware.biometrics.BiometricManager
-import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -17,7 +15,7 @@ import androidx.core.content.ContextCompat
         private var BTPermiso = false //Permiso de Bluetooth
         private var canAuthenticate = false
         lateinit var promptInfo: androidx.biometric.BiometricPrompt.PromptInfo
-
+        var HuellaPermiso = false
 class Permisos : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,9 +23,7 @@ class Permisos : AppCompatActivity() {
 
         setupAuth()
         val botonBluetoothPermisos: Button = findViewById(R.id.BTPermiso)
-        var contadorBT = 0
         val botonHuellaPermiso: Button = findViewById(R.id.HuellaPermiso)
-        var contadorHuella= 0
         val botonSiguienteP: Button = findViewById(R.id.SiguientePermiso)
 
         botonBluetoothPermisos.setOnClickListener {
@@ -36,18 +32,17 @@ class Permisos : AppCompatActivity() {
             }
             else{
                 EscanearBT()
-                contadorBT++
             }
         }
         botonHuellaPermiso.setOnClickListener {
-            if (contadorHuella >= 1){
+            if (HuellaPermiso){
                 Toast.makeText(this, "¡Ya te autenticaste!", Toast.LENGTH_SHORT).show()
             }
             else{
                 Autenticacion { authenticated ->
                     if (authenticated) {
                         Toast.makeText(this, "¡Autenticación exitosa!", Toast.LENGTH_SHORT).show()
-                        contadorHuella ++
+                        HuellaPermiso = true
                     } else {
                         Toast.makeText(this, "¡Autenticación fallida o cancelada!", Toast.LENGTH_SHORT).show()
                     }
@@ -55,7 +50,7 @@ class Permisos : AppCompatActivity() {
            }
         }
         botonSiguienteP.setOnClickListener {
-            if(BTPermiso && contadorHuella>=1){
+            if(BTPermiso && HuellaPermiso){
                 val sharedPref = getSharedPreferences("MyAppPreferences", 0)
                 with (sharedPref.edit()) {
                     putBoolean("isRegistered", true)
@@ -81,7 +76,8 @@ class Permisos : AppCompatActivity() {
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 bluetoothPermissionLauncher.launch(android.Manifest.permission.BLUETOOTH_CONNECT)
-            } else {
+            }
+            else {
                 BTPermiso = true
                 activateBluetooth(bluetoothAdapter)
             }
@@ -103,15 +99,13 @@ class Permisos : AppCompatActivity() {
         if (bluetoothAdapter?.isEnabled == false) {
             val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             btActivityResultLauncher.launch(enableIntent)
-        } else {
-            EscanearBT()
         }
     }
 
     private val btActivityResultLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
-                EscanearBT()
+                Toast.makeText(this, "Bluetooth activado", Toast.LENGTH_LONG).show()
             }
         }
     ///// PERMISOS DE BLUETOOTH
@@ -120,15 +114,16 @@ class Permisos : AppCompatActivity() {
 
     fun setupAuth() {
         val biometricManager = androidx.biometric.BiometricManager.from(this)
-        canAuthenticate = biometricManager.canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL) == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+        canAuthenticate = biometricManager.canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG) == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
         if (canAuthenticate) {
             promptInfo = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Autenticación Biometrica")
                 .setSubtitle("Autentíquese utilizando el sensor")
-                .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                .setNegativeButtonText("Cancelar")
+                .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
                 .build()
         }
-    }//
+    }
 
    fun Autenticacion (auth: (Boolean) -> Unit) {
         if (canAuthenticate) {
